@@ -1,0 +1,76 @@
+version: '3.9'
+
+services:
+
+  redis:
+    container_name: redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=${PG_USER}
+      - POSTGRES_PASSWORD=${PG_PASSWORD}
+      - POSTGRES_DB=${PG_DATABASE}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/docker:/docker-entrypoint-initdb.d
+
+#  twilight:
+#    container_name: twilight
+#    image: twilightrs/http-proxy:metrics
+#    platform: linux/x86_64
+#    environment:
+#      - BOT_TOKEN=${BOT_TOKEN}
+#    ports:
+#      - "6972:80"
+#    env_file: .env
+#    restart: always
+
+  jobs:
+    container_name: jobs
+    build:
+      context: .
+      dockerfile: jobs.Dockerfile
+    ports:
+      - "6974:6974"
+    links:
+      - redis
+      - postgres
+#      - twilight
+    env_file: .env
+    restart: always
+    depends_on:
+      - redis
+      - postgres
+#      - twilight
+
+  bot:
+    container_name: bot
+    build:
+      context: .
+      dockerfile: bot.Dockerfile
+    links:
+      - redis
+      - postgres
+      - jobs
+#      - twilight
+    env_file: .env
+    depends_on:
+      - jobs
+    restart: always
+    ports:
+      - "80:80"
+    expose:
+      - "80"
+
+volumes:
+  postgres_data:
+  redis_data:
